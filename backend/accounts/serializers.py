@@ -40,3 +40,6 @@ class AdminChangeRoleSerializer(serializers.Serializer):
 
 class AdminToggleUserSerializer(serializers.Serializer):
     enabled = serializers.BooleanField()
+
+class AdminResetPasswordSerializer(serializers.Serializer):
+    temporary_password = serializers.CharField(required=False, write_only=True, min_length=12)

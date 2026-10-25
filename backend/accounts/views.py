@@ -12,6 +12,7 @@ from accounts.serializers import (
     AdminCreateUserSerializer,
     AdminToggleUserSerializer,
     AuthMeSerializer,
+    AdminResetPasswordSerializer
 )
 from audit_logs.services import create_audit_entry
 from services.keycloak_admin import KeycloakAdminClient, KeycloakAdminError
@@ -108,6 +109,8 @@ class AdminUserDetailView(APIView):
     throttle_scope = "auth"
 
     def patch(self, request, keycloak_id: str):
+        if keycloak_id == request.user.keycloak_id:
+            return Response({"detail": "You cannot modify your own account"}, status=status.HTTP_400_BAD_REQUEST)
         role_serializer = AdminChangeRoleSerializer(data=request.data)
         toggle_serializer = AdminToggleUserSerializer(data=request.data)
 
@@ -157,3 +160,59 @@ class AdminUserDetailView(APIView):
             return Response({"detail": "No supported update field supplied"}, status=status.HTTP_400_BAD_REQUEST)
         except KeycloakAdminError:
             return Response({"detail": "Upstream identity provider error"}, status=status.HTTP_502_BAD_GATEWAY)
+    
+    def delete(self, request, keycloak_id: str):
+        if keycloak_id == request.user.keycloak_id:
+            return Response({"detail": "You cannot delete your own account"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            KeycloakAdminClient().delete_user(keycloak_id)
+        except KeycloakAdminError:
+            return Response({"detail": "Upstream identity provider error"}, status=status.HTTP_502_BAD_GATEWAY)
+
+        with transaction.atomic():
+            user = User.objects.filter(keycloak_id=keycloak_id).first()
+            if user:
+                create_audit_entry(
+                    user=request.user,
+                    action="admin_deleted_user",
+                    target_model="User",
+                    target_object_id=user.pk,
+                    path=request.path,
+                    method=request.method,
+                    metadata={"keycloak_id": keycloak_id},
+            )
+            user.is_active = False
+            user.keycloak_id = None
+            user.email = f"deleted-{user.pk}@deleted.invalid"
+            user.set_unusable_password()
+            user.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+class AdminResetPasswordView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth"
+
+    def post(self, request, keycloak_id: str):
+        serializer = AdminResetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        password = serializer.validated_data.get("temporary_password")
+        client = KeycloakAdminClient()
+        try:
+            if password:
+                client.set_temporary_password(keycloak_id, password)
+            else:
+                client.send_set_password_email(keycloak_id)  # requires SMTP
+        except KeycloakAdminError:
+            return Response({"detail": "Upstream identity provider error"}, status=status.HTTP_502_BAD_GATEWAY)
+
+        create_audit_entry(
+            user=request.user,
+            action="admin_reset_password",
+            target_model="User",
+            target_object_id=keycloak_id,
+            path=request.path,
+            method=request.method,
+            metadata={"mode": "temporary_password" if password else "email"},
+        )
+        return Response({"detail": "Temporary password set" if password else "Reset email sent"})

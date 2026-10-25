@@ -4,7 +4,7 @@ import { useAuthAdapter } from './useAuthAdapter'
 
 export const useDoctorDashboard = () => {
   const auth = useAuthAdapter()
-  useQuery({
+  return useQuery({
     queryKey: ['dashboard', 'doctor'],
     queryFn: () => dashboardApi.getDoctorDashboard(auth),
   })

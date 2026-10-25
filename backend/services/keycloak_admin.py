@@ -4,7 +4,9 @@ from dataclasses import dataclass
 
 import requests
 from django.conf import settings
+import logging
 
+logger = logging.getLogger(__name__)
 
 class KeycloakAdminError(Exception):
     pass
@@ -20,8 +22,8 @@ class KeycloakUser:
 
 class KeycloakAdminClient:
     def __init__(self):
-        self.base_realm_url = f"{settings.KEYCLOAK_SERVER_URL}/admin/realms/{settings.KEYCLOAK_REALM}"
-        self.token_url = f"{settings.KEYCLOAK_SERVER_URL}/realms/{settings.KEYCLOAK_REALM}/protocol/openid-connect/token"
+        self.base_realm_url = f"{settings.KEYCLOAK_INTERNAL_URL}/admin/realms/{settings.KEYCLOAK_REALM}"
+        self.token_url = f"{settings.KEYCLOAK_INTERNAL_URL}/realms/{settings.KEYCLOAK_REALM}/protocol/openid-connect/token"
 
     def _access_token(self) -> str:
         response = requests.post(
@@ -34,6 +36,7 @@ class KeycloakAdminClient:
             timeout=10,
         )
         if not response.ok:
+            logger.error("Keycloak token request failed: %s %s", response.status_code, response.text[:200])
             raise KeycloakAdminError("Unable to authenticate to Keycloak admin API")
         token = response.json().get("access_token")
         if not token:
@@ -59,8 +62,7 @@ class KeycloakAdminClient:
             "username": email,
             "email": email,
             "enabled": True,
-            "emailVerified": False,
-            "requiredActions": ["VERIFY_EMAIL"],
+            "emailVerified": True,
         }
         if temporary_password:
             payload["credentials"] = [{"type": "password", "value": temporary_password, "temporary": True}]
@@ -74,8 +76,18 @@ class KeycloakAdminClient:
             user_id = self.find_user_by_email(email).id
 
         self.set_user_roles(user_id, [role])
-        self.send_set_password_email(user_id)
+        if not temporary_password:
+            self.send_set_password_email(user_id)  # needs SMTP; give a temporary password in dev
         return user_id
+
+    def set_temporary_password(self, user_id: str, password: str):
+        response = self._request(
+            "PUT",
+            f"/users/{user_id}/reset-password",
+            json={"type": "password", "value": password, "temporary": True},
+        )
+        if response.status_code != 204:
+            raise KeycloakAdminError("Failed to reset password")
 
     def delete_user(self, user_id: str):
         response = self._request("DELETE", f"/users/{user_id}")
@@ -147,5 +159,6 @@ class KeycloakAdminClient:
     def user_roles(self, user_id: str) -> list[str]:
         response = self._request("GET", f"/users/{user_id}/role-mappings/realm")
         if not response.ok:
+            logger.error("Keycloak list users failed: %s %s", response.status_code, response.text[:200])
             raise KeycloakAdminError("Failed to fetch user roles")
         return [role["name"] for role in response.json()]

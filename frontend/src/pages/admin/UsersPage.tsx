@@ -1,113 +1,130 @@
-import { useState } from 'react'
-import { ApiError } from '../../api/client'
+import { useCallback, useEffect, useState } from 'react'
+import { adminUsersApi, type AdminUserItem } from '../../api/adminUsersApi'
 import { AppShell } from '../../components/layout/AppShell'
-import { Button, Card, EmptyState, Skeleton, WidgetError } from '../../components/ui'
-import { useAdminUserMutations, useAdminUsers } from '../../hooks/useAdminUsers'
-import type { AssignableRole } from '../../types'
+import { Badge, Button, Card, EmptyState, Skeleton, WidgetError } from '../../components/ui'
+import { useAuth } from '../../contexts/AuthContext'
+import { useAuthAdapter } from '../../hooks/useAuthAdapter'
 
-const fieldMessages = (error: unknown, field: string): string[] => {
-  if (!(error instanceof ApiError)) return []
+type ManagedRole = 'patient' | 'doctor'
 
-  const fieldErrors = (error as unknown as { fieldErrors?: Record<string, string[]> }).fieldErrors
-  return fieldErrors?.[field] ?? []
-}
+const roleOf = (user: AdminUserItem): ManagedRole | 'admin' =>
+  user.roles.includes('admin') ? 'admin' : user.roles.includes('doctor') ? 'doctor' : 'patient'
 
 export const AdminUsersPage = () => {
-  const { data: users = [], isLoading, isError, error, refetch } = useAdminUsers()
-  const { create, toggleEnabled, changeRole } = useAdminUserMutations()
-  const [email, setEmail] = useState('')
-  const [role, setRole] = useState<AssignableRole>('patient')
+  const adapter = useAuthAdapter()
+  const { user: me } = useAuth()
 
-  const handleCreate = () => {
-    const trimmed = email.trim()
-    if (!trimmed) return
-    create.mutate({ email: trimmed, role }, { onSuccess: () => setEmail('') })
+  const [users, setUsers] = useState<AdminUserItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [role, setRole] = useState<ManagedRole>('patient')
+
+  const loadUsers = useCallback(async () => {
+    try {
+      setUsers(await adminUsersApi.list(adapter))
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Request failed')
+    } finally {
+      setLoading(false)
+    }
+  }, [adapter])
+
+  useEffect(() => {
+    void loadUsers()
+  }, [loadUsers])
+
+  const run = async (action: () => Promise<unknown>, success: string) => {
+    try {
+      await action()
+      setNotice(success)
+      setError(null)
+      await loadUsers()
+    } catch (e) {
+      setNotice(null)
+      setError(e instanceof Error ? e.message : 'Request failed')
+    }
   }
 
-  const actionError = toggleEnabled.error ?? changeRole.error
-  const emailErrors = fieldMessages(create.error, 'email')
-  const roleErrors = fieldMessages(create.error, 'role')
-  const createGenericError =
-    create.error && emailErrors.length === 0 && roleErrors.length === 0 ? create.error.message : null
+  const handleCreate = () => {
+    if (!email) return
+    void run(async () => {
+      await adminUsersApi.create({ email, role, temporary_password: password || undefined }, adapter)
+      setEmail('')
+      setPassword('')
+    }, 'User created')
+  }
+
+  const handleReset = (u: AdminUserItem) => {
+    const value = window.prompt('Temporary password (min 12 characters). Leave empty to send a reset email.') ?? null
+    if (value === null) return
+    void run(() => adminUsersApi.resetPassword(u.keycloak_id, value || undefined, adapter), 'Password reset')
+  }
+
+  const handleDelete = (u: AdminUserItem) => {
+    if (!window.confirm(`Delete ${u.email}? They will no longer be able to sign in.`)) return
+    void run(() => adminUsersApi.remove(u.keycloak_id, adapter), 'User deleted')
+  }
 
   return (
     <AppShell>
       <Card title="Admin - Users">
-        <div className="mb-4 flex flex-wrap gap-2">
-          <div>
-            <input
-              className="rounded border px-3 py-2"
-              placeholder="Email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              aria-invalid={emailErrors.length > 0}
-            />
-            {emailErrors.map((message) => (
-              <p key={message} className="mt-1 text-xs text-brand-rose">
-                {message}
-              </p>
-            ))}
-          </div>
-          <div>
-            <select
-              className="rounded border px-3 py-2"
-              value={role}
-              onChange={(event) => setRole(event.target.value as AssignableRole)}
-            >
-              <option value="patient">Patient</option>
-              <option value="doctor">Doctor</option>
-            </select>
-            {roleErrors.map((message) => (
-              <p key={message} className="mt-1 text-xs text-brand-rose">
-                {message}
-              </p>
-            ))}
-          </div>
-          <Button onClick={handleCreate} disabled={create.isPending || !email.trim()}>
-            {create.isPending ? 'Creating…' : 'Create user'}
-          </Button>
-        </div>
-        {createGenericError && <p className="mb-3 text-sm text-brand-rose">{createGenericError}</p>}
-        {actionError && <p className="mb-3 text-sm text-brand-rose">{actionError.message}</p>}
+        {error && <WidgetError message={error} onRetry={() => void loadUsers()} />}
+        {notice && <p className="mb-3 text-sm text-brand-teal" role="status">{notice}</p>}
 
-        {isLoading && <Skeleton className="h-32 w-full" />}
-        {isError && <WidgetError message={error.message} onRetry={() => void refetch()} />}
-        {!isLoading && !isError && users.length === 0 && (
-          <EmptyState title="No users" description="Created users will appear here." />
+        <div className="mb-4 flex flex-wrap gap-2">
+          <input className="rounded border px-3 py-2" placeholder="Email" value={email}
+            onChange={(e) => setEmail(e.target.value)} />
+          <input className="rounded border px-3 py-2" type="password" placeholder="Temporary password (12+ chars)"
+            value={password} onChange={(e) => setPassword(e.target.value)} />
+          <select className="rounded border px-3 py-2" value={role}
+            onChange={(e) => setRole(e.target.value as ManagedRole)}>
+            <option value="patient">Patient</option>
+            <option value="doctor">Doctor</option>
+          </select>
+          <Button onClick={handleCreate}>Create user</Button>
+        </div>
+
+        {loading && <Skeleton className="h-24 w-full" />}
+        {!loading && users.length === 0 && !error && (
+          <EmptyState title="Aucun utilisateur" description="Créez un premier compte ci-dessus." />
         )}
 
         <div className="space-y-2">
-          {users.map((user) => {
-            const isAdminUser = user.roles.includes('admin')
-            const mappedRole: AssignableRole = user.roles.includes('doctor') ? 'doctor' : 'patient'
+          {users.map((u) => {
+            const current = roleOf(u)
+            const isSelf = u.email === me?.email
             return (
-              <div key={user.keycloak_id} className="flex items-center justify-between rounded border p-3">
+              <div key={u.keycloak_id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-3">
                 <div>
-                  <p className="font-medium">{user.email}</p>
-                  <p className="text-xs text-text-muted">{user.roles.join(', ')}</p>
+                  <p className="font-medium">{u.email}</p>
+                  <div className="mt-1 flex gap-2">
+                    <Badge tone="blue">{current}</Badge>
+                    <Badge tone={u.enabled ? 'teal' : 'rose'}>{u.enabled ? 'active' : 'disabled'}</Badge>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    disabled={toggleEnabled.isPending}
-                    onClick={() => toggleEnabled.mutate({ keycloakId: user.keycloak_id, enabled: !user.enabled })}
-                  >
-                    {user.enabled ? 'Disable' : 'Enable'}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    disabled={changeRole.isPending || isAdminUser}
-                    title={isAdminUser ? 'Admin roles cannot be changed here' : undefined}
-                    onClick={() =>
-                      changeRole.mutate({
-                        keycloakId: user.keycloak_id,
-                        role: mappedRole === 'doctor' ? 'patient' : 'doctor',
-                      })
+                <div className="flex flex-wrap gap-2">
+                  <select
+                    className="rounded border px-2 py-1 text-sm"
+                    value={current === 'admin' ? '' : current}
+                    disabled={isSelf || current === 'admin'}
+                    onChange={(e) =>
+                      void run(() => adminUsersApi.changeRole(u.keycloak_id, e.target.value as ManagedRole, adapter), 'Role updated')
                     }
                   >
-                    Toggle role
+                    {current === 'admin' && <option value="">admin</option>}
+                    <option value="patient">Patient</option>
+                    <option value="doctor">Doctor</option>
+                  </select>
+                  <Button variant="secondary" disabled={isSelf}
+                    onClick={() => void run(() => adminUsersApi.toggleEnabled(u.keycloak_id, !u.enabled, adapter), 'Status updated')}>
+                    {u.enabled ? 'Deactivate' : 'Activate'}
                   </Button>
+                  <Button variant="ghost" onClick={() => handleReset(u)}>Reset password</Button>
+                  <Button variant="ghost" disabled={isSelf} onClick={() => handleDelete(u)}>Delete</Button>
                 </div>
               </div>
             )

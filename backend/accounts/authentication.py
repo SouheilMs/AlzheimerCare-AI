@@ -16,6 +16,9 @@ from audit_logs.services import create_audit_entry
 
 User = get_user_model()
 
+class IdentityProviderUnavailable(exceptions.APIException):
+    status_code = 503
+    default_detail = "Identity provider unavailable"
 
 class KeycloakJwksCache:
     _lock = threading.Lock()
@@ -28,12 +31,14 @@ class KeycloakJwksCache:
             now = time.time()
             if cls._jwks and (now - cls._fetched_at) < settings.KEYCLOAK_JWKS_CACHE_TTL:
                 return cls._jwks
-            with urlopen(settings.KEYCLOAK_JWKS_URL, timeout=5) as response:
-                payload = response.read().decode("utf-8")
+            try:
+                with urlopen(settings.KEYCLOAK_JWKS_URL, timeout=5) as response:
+                    payload = response.read().decode("utf-8")
+            except OSError as exc:  # URLError is a subclass
+                raise IdentityProviderUnavailable() from exc
             cls._jwks = json.loads(payload)
             cls._fetched_at = now
             return cls._jwks
-
 
 class KeycloakAuthentication(authentication.BaseAuthentication):
     www_authenticate_realm = "api"
