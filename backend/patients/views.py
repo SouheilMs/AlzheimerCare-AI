@@ -13,6 +13,8 @@ from rest_framework.views import APIView
 from accounts.permissions import IsPatient
 from audit_logs.services import create_audit_entry
 from patients.serializers import MRIScanSerializer
+from patients.ai_client import AIServiceError, predict_mri
+from patients.models import MRIScan, PatientProfile
 
 class PatientProfileDetailView(SensitiveObjectAuditMixin, RetrieveAPIView):
     queryset = PatientProfile.objects.select_related("user")
@@ -62,4 +64,17 @@ class MRIScanListCreateView(APIView):
             method=request.method,
             metadata={"patient_profile_id": profile.pk},
         )
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        scan.status = MRIScan.Status.ANALYZING
+        scan.save(update_fields=["status"])
+        try:
+            result = predict_mri(scan)
+            scan.risk_score = result["risk_score"]
+            scan.confidence = result.get("confidence")
+            scan.model_version = result.get("model_version", "")
+            scan.simulated = result.get("simulated", False)
+            scan.status = MRIScan.Status.DONE
+        except (AIServiceError, KeyError):
+            scan.status = MRIScan.Status.FAILED
+        scan.save()
+
+        return Response(MRIScanSerializer(scan, context={"request": request}).data, status=status.HTTP_201_CREATED)

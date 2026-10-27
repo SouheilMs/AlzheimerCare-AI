@@ -94,6 +94,8 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 MRI_ALLOWED_EXTENSIONS = [".nii", ".nii.gz", ".dcm"]
 MRI_MAX_UPLOAD_MB = 100
+AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "http://ai-service:8001")
+AI_SERVICE_TIMEOUT = int(os.getenv("AI_SERVICE_TIMEOUT", "60"))
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "accounts.User"

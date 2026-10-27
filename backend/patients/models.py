@@ -54,7 +54,10 @@ class MRIScan(models.Model):
         choices=Status.choices,
         default=Status.PENDING,
     )
-
+    risk_score = models.FloatField(null=True, blank=True)
+    confidence = models.FloatField(null=True, blank=True)
+    model_version = models.CharField(max_length=64, blank=True)
+    simulated = models.BooleanField(default=False)
     class Meta:
         ordering = ["-uploaded_at"]
 

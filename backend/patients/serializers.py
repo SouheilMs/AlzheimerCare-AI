@@ -22,8 +22,9 @@ class PatientClinicalUpdateSerializer(serializers.ModelSerializer):
 class MRIScanSerializer(serializers.ModelSerializer):
     class Meta:
         model = MRIScan
-        fields = ["id", "file", "uploaded_at", "status"]
-        read_only_fields = ["id", "uploaded_at", "status"]
+        fields = ["id", "file", "uploaded_at", "status", "risk_score", "confidence", "model_version", "simulated"]
+        read_only_fields = ["id", "uploaded_at", "status", "risk_score", "confidence", "model_version", "simulated"]
+
 
     def validate_file(self, value):
         name = value.name.lower()
