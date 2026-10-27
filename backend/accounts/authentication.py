@@ -132,6 +132,13 @@ class KeycloakAuthentication(authentication.BaseAuthentication):
                     user=user,
                     defaults={"pseudonym": f"patient-{uuid.uuid4().hex[:12]}"},
                 )
+            if user.role == UserRole.DOCTOR:
+                from doctors.models import DoctorProfile
+
+                DoctorProfile.objects.get_or_create(
+                    user=user,
+                    defaults={"license_number": f"TMP-{uuid.uuid4().hex[:10]}"},
+                )
             if created:
                 create_audit_entry(
                     user=user,
