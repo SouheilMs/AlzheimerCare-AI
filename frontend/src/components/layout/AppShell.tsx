@@ -1,5 +1,6 @@
 import {
   Activity,
+  Brain,
   CalendarCheck,
   FileText,
   Gamepad2,
@@ -26,8 +27,9 @@ const navByRole: Record<
     icon: ReactNode
   }>
 > = {
-  patient: [
+   patient: [
     { label: 'Dashboard', to: '/patient/dashboard', icon: <LayoutDashboard size={16} /> },
+    { label: 'Mes IRM', to: '/patient/mri', icon: <Brain size={16} /> },
     { label: 'My tests', to: '/patient/tests', icon: <Activity size={16} /> },
     { label: 'Cognitive games', to: '/patient/games', icon: <Gamepad2 size={16} /> },
     { label: 'My progress', to: '/patient/progress', icon: <LineChart size={16} /> },
