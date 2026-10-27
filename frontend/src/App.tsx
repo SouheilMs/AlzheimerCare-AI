@@ -7,7 +7,7 @@ import { PlaceholderPage } from './pages/PlaceholderPage'
 import { SessionExpiredPage } from './pages/SessionExpiredPage'
 import { PatientDashboard } from './pages/patient/Dashboard'
 import { ProtectedRoute, RoleLandingRedirect } from './routes/RouteGuards'
-
+import { MriUpload } from './pages/patient/MriUpload'
 function App() {
   return (
     <Routes>
@@ -114,9 +114,17 @@ function App() {
           </ProtectedRoute>
         }
       />
-
+      <Route
+        path="/patient/mri"
+        element={
+          <ProtectedRoute allowedRoles={['patient']}>
+            <MriUpload />
+          </ProtectedRoute>
+        }
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    
   )
 }
 
