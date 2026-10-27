@@ -1,3 +1,4 @@
+backend/media/
 __pycache__/
 *.py[cod]
 *.sqlite3
