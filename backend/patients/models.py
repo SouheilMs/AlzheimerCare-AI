@@ -35,3 +35,28 @@ class DoctorPatientAssignment(models.Model):
 
     def __str__(self) -> str:
         return f"Assignment<{self.doctor_id}:{self.patient_id}>"
+class MRIScan(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        ANALYZING = "analyzing", "Analyzing"
+        DONE = "done", "Done"
+        FAILED = "failed", "Failed"
+
+    patient = models.ForeignKey(
+        PatientProfile,
+        on_delete=models.CASCADE,
+        related_name="mri_scans",
+    )
+    file = models.FileField(upload_to="mri_scans/")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+
+    class Meta:
+        ordering = ["-uploaded_at"]
+
+    def __str__(self) -> str:
+        return f"MRIScan<{self.pk}:{self.patient_id}>"
