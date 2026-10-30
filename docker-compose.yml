@@ -92,7 +92,7 @@ services:
     container_name: Alzheimers-AI-Service
     build: ./ai-service
     env_file: .env
-    command: sh -c "pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port ${AI_SERVICE_PORT:-8001}"
+    command: sh -c "pip install --default-timeout=1000 --retries 10 -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port ${AI_SERVICE_PORT:-8001}"
     volumes:
       - ./ai-service:/app
     ports:
@@ -100,6 +100,14 @@ services:
     depends_on:
       - backend
 
+  mailpit:
+    container_name: Alzheimers-Mailpit
+    image: axllent/mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
 volumes:
   postgres_data:
   keycloak_postgres_data:
+  

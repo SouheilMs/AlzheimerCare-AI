@@ -8,6 +8,9 @@ import { SessionExpiredPage } from './pages/SessionExpiredPage'
 import { PatientDashboard } from './pages/patient/Dashboard'
 import { ProtectedRoute, RoleLandingRedirect } from './routes/RouteGuards'
 import { MriUpload } from './pages/patient/MriUpload'
+import { DoctorPatients } from './pages/doctor/Patients'
+import { DoctorPatientDetail } from './pages/doctor/PatientDetail'
+
 function App() {
   return (
     <Routes>
@@ -66,13 +69,21 @@ function App() {
         }
       />
       <Route
-        path="/doctor/patients"
-        element={
-          <ProtectedRoute allowedRoles={['doctor']}>
-            <PlaceholderPage title="My patients" />
-          </ProtectedRoute>
-        }
-      />
+  path="/doctor/patients"
+  element={
+    <ProtectedRoute allowedRoles={['doctor']}>
+      <DoctorPatients />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/doctor/patients/:id"
+  element={
+    <ProtectedRoute allowedRoles={['doctor']}>
+      <DoctorPatientDetail />
+    </ProtectedRoute>
+  }
+/>
       <Route
         path="/doctor/consultations"
         element={

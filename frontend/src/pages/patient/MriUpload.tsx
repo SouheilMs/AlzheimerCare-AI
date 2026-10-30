@@ -4,7 +4,7 @@ import { AppShell } from '../../components/layout/AppShell'
 import { Badge, Button, Card, EmptyState, Skeleton, WidgetError } from '../../components/ui'
 import { useMriScans, useUploadMri } from '../../hooks/useMriScans'
 import { formatDate } from '../../lib/format'
-
+import { BookingDialog } from '../../components/appointments/BookingDialog'
 const statusTone = {
   pending: 'amber',
   analyzing: 'blue',
@@ -24,18 +24,22 @@ export const MriUpload = () => {
   const upload = useUploadMri()
   const inputRef = useRef<HTMLInputElement>(null)
   const [localError, setLocalError] = useState<string | null>(null)
-
+  const [showBooking, setShowBooking] = useState(false)
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
     const name = file.name.toLowerCase()
-    if (!['.nii', '.nii.gz', '.dcm'].some((ext) => name.endsWith(ext))) {
-      setLocalError('Format non accepté. Formats autorisés : .nii, .nii.gz, .dcm')
-      return
-    }
+    if (!name.endsWith('.zip')) {
+  setLocalError('Format non accepté. Envoyez un fichier ZIP contenant 16 images PNG.')
+  return
+}
     setLocalError(null)
-    upload.mutate(file)
+    upload.mutate(file, {
+  onSuccess: (scan) => {
+    if (scan.needs_appointment) setShowBooking(true)
+  },
+})
   }
 
   const serverError = (() => {
@@ -58,17 +62,14 @@ export const MriUpload = () => {
       </section>
 
       <Card title="Importer une IRM" className="mb-4">
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".nii,.gz,.dcm"
-          className="hidden"
-          onChange={handleChange}
-        />
+        <input ref={inputRef} type="file" accept=".zip" className="hidden" onChange={handleChange} />
+
         <Button onClick={() => inputRef.current?.click()} disabled={upload.isPending}>
           {upload.isPending ? 'Envoi en cours…' : 'Choisir un fichier'}
         </Button>
-        <p className="mt-2 text-xs text-text-muted">Formats acceptés : .nii, .nii.gz, .dcm (100 Mo maximum).</p>
+        <p className="mt-2 text-xs text-text-muted">
+  Format accepté : un fichier .zip contenant 16 images PNG (100 Mo maximum).
+</p>
         {(localError ?? serverError) && (
           <p className="mt-2 text-sm text-brand-rose" role="alert">
             {localError ?? serverError}
@@ -96,6 +97,7 @@ export const MriUpload = () => {
           </ul>
         )}
       </Card>
+      {showBooking && <BookingDialog onClose={() => setShowBooking(false)} />}
     </AppShell>
   )
 }
