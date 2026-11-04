@@ -1,0 +1,28 @@
+/* Animations de l'interface IRM médecin (CSS pur, aucune dépendance) */
+@keyframes mri-fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes mri-spin { to { transform: rotate(360deg); } }
+@keyframes mri-spin-rev { to { transform: rotate(-360deg); } }
+@keyframes mri-halo { 0%, 100% { transform: scale(1); opacity: 0.16; } 50% { transform: scale(1.1); opacity: 0.04; } }
+@keyframes mri-brain { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+@keyframes mri-scan { 0% { top: 6%; } 50% { top: 92%; } 100% { top: 6%; } }
+@keyframes mri-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes mri-pop { 0% { transform: scale(0); opacity: 0; } 70% { transform: scale(1.25); } 100% { transform: scale(1); opacity: 1; } }
+@keyframes mri-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+.mri-fade-up { animation: mri-fade-up 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0ms); }
+.mri-spin { animation: mri-spin 2.8s linear infinite; }
+.mri-spin-rev { animation: mri-spin-rev 4.2s linear infinite; }
+.mri-halo { animation: mri-halo 2.4s ease-in-out infinite; }
+.mri-brain { animation: mri-brain 1.6s ease-in-out infinite; }
+.mri-scanline { position: absolute; animation: mri-scan 3.2s ease-in-out infinite; }
+.mri-scanline-slow { position: absolute; animation: mri-scan 7s ease-in-out infinite; opacity: 0.35; }
+.mri-draw { stroke-dasharray: 1; stroke-dashoffset: 0; animation: mri-draw 1.4s ease-out both; }
+.mri-pop { transform-box: fill-box; transform-origin: center; animation: mri-pop 0.5s ease-out both; animation-delay: var(--d, 0ms); }
+.mri-dot { animation: mri-dot 1.4s ease-in-out infinite; }
+.mri-ring-progress { transition: stroke-dashoffset 1.4s cubic-bezier(0.22, 1, 0.36, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mri-fade-up, .mri-spin, .mri-spin-rev, .mri-halo, .mri-brain, .mri-scanline, .mri-scanline-slow,
+  .mri-draw, .mri-pop, .mri-dot { animation: none !important; }
+  .mri-ring-progress { transition: none; }
+}

@@ -22,6 +22,8 @@ from patients.serializers import (
     PatientProfileSerializer,
 )
 from notifications.services import notify_doctors_new_mri
+from notifications.patient_alerts import notify_patient_follow_up
+
 
 class PatientProfileDetailView(SensitiveObjectAuditMixin, RetrieveAPIView):
     queryset = PatientProfile.objects.select_related("user")
@@ -150,6 +152,10 @@ class MRIScanAnalyzeView(APIView):
             scan.confidence = None
             scan.model_version = ""
         scan.save()
+
+        # Risque élevé : propose un rendez-vous de suivi au patient (application + email)
+        if scan.status == MRIScan.Status.DONE:
+            notify_patient_follow_up(scan)
 
         create_audit_entry(
             user=request.user,

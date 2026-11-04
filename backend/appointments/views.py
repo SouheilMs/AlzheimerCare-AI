@@ -1,15 +1,26 @@
 from django.shortcuts import render
 
 # Create your views here.
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsPatient
+from accounts.permissions import IsDoctor, IsPatient
 from appointments.models import Appointment
-from appointments.serializers import AppointmentSerializer, BookAppointmentSerializer
-from appointments.services import SlotUnavailable, book_appointment, find_best_doctor_slots
+from appointments.serializers import (
+    AppointmentSerializer,
+    BookAppointmentSerializer,
+    DoctorAppointmentSerializer,
+)
+from appointments.services import (
+    SlotUnavailable,
+    book_appointment,
+    find_best_doctor_slots,
+    get_free_slots,
+    selectable_doctors,
+)
 from audit_logs.services import create_audit_entry
 from doctors.models import DoctorProfile
 from patients.models import DoctorPatientAssignment
@@ -19,7 +30,27 @@ def _patient_profile(request):
     return getattr(request.user, "patient_profile", None)
 
 
+def _doctor_payload(doctor):
+    user = doctor.user
+    full_name = f"{user.first_name} {user.last_name}".strip()
+    return {
+        "id": doctor.pk,
+        "email": user.email,
+        "license_number": doctor.license_number,
+        "name": f"Dr. {full_name}" if full_name else user.email,
+        "specialty": doctor.specialty,
+    }
+
+
 class SuggestedSlotsView(APIView):
+    """Créneaux libres les plus proches.
+
+    Sans paramètre : le médecin avec le créneau le plus proche (comportement d'origine).
+    ?doctor_id=<id> : les créneaux du médecin choisi (parmi ceux que le patient peut choisir).
+    ?limit=<n>      : nombre de créneaux (5 par défaut, 200 au maximum).
+    La réponse contient aussi "doctors" : la liste des médecins sélectionnables.
+    """
+
     permission_classes = [permissions.IsAuthenticated, IsPatient]
 
     def get(self, request):
@@ -27,18 +58,35 @@ class SuggestedSlotsView(APIView):
         if profile is None:
             return Response({"detail": "Patient profile not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        result = find_best_doctor_slots(profile)
-        if result is None:
-            return Response({"detail": "Aucun créneau disponible"}, status=status.HTTP_404_NOT_FOUND)
+        doctors = list(selectable_doctors(profile))
+        if not doctors:
+            return Response({"detail": "Aucun médecin disponible"}, status=status.HTTP_404_NOT_FOUND)
 
-        doctor, slots = result
+        try:
+            limit = max(1, min(int(request.query_params.get("limit", 5)), 200))
+        except ValueError:
+            limit = 5
+
+        doctor_id = request.query_params.get("doctor_id")
+        if doctor_id:
+            try:
+                wanted = int(doctor_id)
+            except ValueError:
+                return Response({"detail": "doctor_id invalide"}, status=status.HTTP_400_BAD_REQUEST)
+            doctor = next((d for d in doctors if d.pk == wanted), None)
+            if doctor is None:
+                return Response({"detail": "Médecin non autorisé"}, status=status.HTTP_403_FORBIDDEN)
+            slots = get_free_slots(doctor, limit=limit)
+        else:
+            result = find_best_doctor_slots(profile, limit=limit)
+            if result is None:
+                return Response({"detail": "Aucun créneau disponible"}, status=status.HTTP_404_NOT_FOUND)
+            doctor, slots = result
+
         return Response(
             {
-                "doctor": {
-                    "id": doctor.pk,
-                    "email": doctor.user.email,
-                    "license_number": doctor.license_number,
-                },
+                "doctor": _doctor_payload(doctor),
+                "doctors": [_doctor_payload(d) for d in doctors],
                 "slots": [{"starts_at": s.isoformat(), "ends_at": e.isoformat()} for s, e in slots],
             }
         )
@@ -98,3 +146,22 @@ class AppointmentListCreateView(APIView):
             metadata={"doctor_id": doctor.pk},
         )
         return Response(AppointmentSerializer(appointment).data, status=status.HTTP_201_CREATED)
+
+
+class DoctorAppointmentListView(APIView):
+    """Les rendez-vous du médecin connecté.
+
+    ?scope=upcoming (défaut) : rendez-vous à venir, du plus proche au plus lointain.
+    ?scope=past              : rendez-vous passés ou annulés (50 derniers).
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsDoctor]
+
+    def get(self, request):
+        qs = Appointment.objects.filter(doctor__user=request.user).select_related("patient__user")
+        now = timezone.now()
+        if request.query_params.get("scope") == "past":
+            qs = qs.filter(Q(ends_at__lte=now) | ~Q(status=Appointment.Status.SCHEDULED)).order_by("-starts_at")[:50]
+        else:
+            qs = qs.filter(status=Appointment.Status.SCHEDULED, ends_at__gt=now).order_by("starts_at")
+        return Response(DoctorAppointmentSerializer(qs, many=True).data)

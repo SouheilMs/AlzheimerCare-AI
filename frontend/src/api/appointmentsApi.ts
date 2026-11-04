@@ -5,8 +5,17 @@ export interface Slot {
   ends_at: string
 }
 
+export interface DoctorOption {
+  id: number
+  email: string
+  license_number: string
+  name?: string
+  specialty?: string
+}
+
 export interface SuggestedSlots {
-  doctor: { id: number; email: string; license_number: string }
+  doctor: DoctorOption
+  doctors?: DoctorOption[]
   slots: Slot[]
 }
 
@@ -21,11 +30,23 @@ export interface Appointment {
   status: string
 }
 
+export interface BookPayload {
+  doctor_id: number
+  starts_at: string
+  mode?: 'in-person' | 'video'
+}
+
 const base = `${API_BASE_URL}/api/appointments/`
 
 export const appointmentsApi = {
-  suggestedSlots: (auth: AuthTokenAdapter) =>
-    requestJson<SuggestedSlots>(`${base}suggested-slots/`, { method: 'GET' }, auth),
-  book: (payload: { doctor_id: number; starts_at: string }, auth: AuthTokenAdapter) =>
+  suggestedSlots: (auth: AuthTokenAdapter, opts: { doctorId?: number; limit?: number } = {}) => {
+    const params = new URLSearchParams()
+    if (opts.doctorId !== undefined) params.set('doctor_id', String(opts.doctorId))
+    if (opts.limit !== undefined) params.set('limit', String(opts.limit))
+    const query = params.toString()
+    return requestJson<SuggestedSlots>(`${base}suggested-slots/${query ? `?${query}` : ''}`, { method: 'GET' }, auth)
+  },
+  list: (auth: AuthTokenAdapter) => requestJson<Appointment[]>(base, { method: 'GET' }, auth),
+  book: (payload: BookPayload, auth: AuthTokenAdapter) =>
     requestJson<Appointment>(base, { method: 'POST', body: JSON.stringify(payload) }, auth),
 }

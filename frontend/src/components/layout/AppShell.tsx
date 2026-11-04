@@ -41,6 +41,8 @@ const navByRole: Record<
     { label: 'Consultations', to: '/doctor/consultations', icon: <Stethoscope size={16} /> },
     { label: 'AI predictions', to: '/doctor/predictions', icon: <Activity size={16} /> },
     { label: 'Medical reports', to: '/doctor/reports', icon: <FileText size={16} /> },
+    { label: 'IRM patients', to: '/doctor/mri', icon: <Brain size={16} /> },
+    { label: 'Appointments', to: '/doctor/appointments', icon: <CalendarCheck size={16} /> },
   ],
   admin: [
     { label: 'Dashboard', to: '/admin/dashboard', icon: <LayoutDashboard size={16} /> },

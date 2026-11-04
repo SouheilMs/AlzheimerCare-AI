@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "appointments",
     "notifications",
     "predictions",
+    "consultations",
 ]
 
 MIDDLEWARE = [
@@ -155,3 +156,11 @@ KEYCLOAK_INTERNAL_URL = os.getenv("KEYCLOAK_INTERNAL_URL", KEYCLOAK_SERVER_URL).
 KEYCLOAK_JWKS_URL = f"{KEYCLOAK_INTERNAL_URL}/realms/{KEYCLOAK_REALM}/protocol/openid-connect/certs"
 KEYCLOAK_JWKS_CACHE_TTL = int(os.getenv("KEYCLOAK_JWKS_CACHE_TTL", "300"))
 KEYCLOAK_CLOCK_SKEW_SECONDS = int(os.getenv("KEYCLOAK_CLOCK_SKEW_SECONDS", "30"))
+LIVEKIT_URL = os.environ["LIVEKIT_URL"]
+LIVEKIT_API_KEY = os.environ["LIVEKIT_API_KEY"]
+LIVEKIT_API_SECRET = os.environ["LIVEKIT_API_SECRET"]
+CONSULTATION_JOIN_MINUTES_BEFORE = 15
+CONSULTATION_JOIN_MINUTES_AFTER = 15
+AGENT_SHARED_SECRET = os.getenv("AGENT_SHARED_SECRET", "")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")

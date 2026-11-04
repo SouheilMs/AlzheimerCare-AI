@@ -44,18 +44,21 @@ def get_free_slots(doctor, limit=5):
     return slots
 
 
-def find_best_doctor_slots(patient, limit=5):
-    """Retourne (doctor, slots) pour le médecin dont le créneau libre est le plus proche."""
+def selectable_doctors(patient):
+    """Médecins que le patient peut choisir : ses médecins assignés, sinon tous les médecins."""
     assigned_ids = list(
         DoctorPatientAssignment.objects.filter(patient=patient).values_list("doctor_id", flat=True)
     )
-
     doctors = DoctorProfile.objects.select_related("user")
     if assigned_ids:
         doctors = doctors.filter(pk__in=assigned_ids)
+    return doctors.order_by("pk")
 
+
+def find_best_doctor_slots(patient, limit=5):
+    """Retourne (doctor, slots) pour le médecin dont le créneau libre est le plus proche."""
     best = None
-    for doctor in doctors.order_by("pk"):
+    for doctor in selectable_doctors(patient):
         slots = get_free_slots(doctor, limit=limit)
         if not slots:
             continue
@@ -93,6 +96,7 @@ def book_appointment(patient, doctor_id, starts_at, mode=Appointment.Mode.IN_PER
         local_start = starts_at.astimezone(ZoneInfo(settings.APPOINTMENT_TIMEZONE))
         Notification.objects.create(
             user=doctor.user,
+            link="/doctor/appointments",
             message=(
                 f"Nouveau patient ({patient.pseudonym}) : rendez-vous le "
                 f"{local_start:%d/%m/%Y} à {local_start:%H:%M}."
