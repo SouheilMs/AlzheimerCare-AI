@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "appointments",
     "notifications",
     "predictions",
+    "consultations",
 ]
 
 MIDDLEWARE = [
@@ -92,9 +93,18 @@ USE_TZ = True
 STATIC_URL = "static/"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
-MRI_ALLOWED_EXTENSIONS = [".nii", ".nii.gz", ".dcm"]
+MRI_ALLOWED_EXTENSIONS = [".zip"]
 MRI_MAX_UPLOAD_MB = 100
+AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "http://ai-service:8001")
+AI_SERVICE_TIMEOUT = int(os.getenv("AI_SERVICE_TIMEOUT", "60"))
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+MRI_HIGH_RISK_THRESHOLD = float(os.getenv("MRI_HIGH_RISK_THRESHOLD", "0.6"))
+APPOINTMENT_TIMEZONE = "Africa/Tunis"
+APPOINTMENT_WORK_START_HOUR = 9
+APPOINTMENT_WORK_END_HOUR = 17
+APPOINTMENT_SLOT_MINUTES = 30
+APPOINTMENT_DAYS_AHEAD = 14
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -115,7 +125,14 @@ REST_FRAMEWORK = {
     },
 }
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "1025"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "False").lower() == "true"
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "AlzheimerCare AI <no-reply@alzheimercare.local>")
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173").rstrip("/")
 FRONTEND_PASSWORD_RESET_URL = os.getenv("FRONTEND_PASSWORD_RESET_URL", "http://localhost:5173/reset-password")
 
 CORS_ALLOWED_ORIGINS = [
@@ -139,3 +156,11 @@ KEYCLOAK_INTERNAL_URL = os.getenv("KEYCLOAK_INTERNAL_URL", KEYCLOAK_SERVER_URL).
 KEYCLOAK_JWKS_URL = f"{KEYCLOAK_INTERNAL_URL}/realms/{KEYCLOAK_REALM}/protocol/openid-connect/certs"
 KEYCLOAK_JWKS_CACHE_TTL = int(os.getenv("KEYCLOAK_JWKS_CACHE_TTL", "300"))
 KEYCLOAK_CLOCK_SKEW_SECONDS = int(os.getenv("KEYCLOAK_CLOCK_SKEW_SECONDS", "30"))
+LIVEKIT_URL = os.environ["LIVEKIT_URL"]
+LIVEKIT_API_KEY = os.environ["LIVEKIT_API_KEY"]
+LIVEKIT_API_SECRET = os.environ["LIVEKIT_API_SECRET"]
+CONSULTATION_JOIN_MINUTES_BEFORE = 15
+CONSULTATION_JOIN_MINUTES_AFTER = 15
+AGENT_SHARED_SECRET = os.getenv("AGENT_SHARED_SECRET", "")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")

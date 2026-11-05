@@ -7,6 +7,14 @@ import { PlaceholderPage } from './pages/PlaceholderPage'
 import { SessionExpiredPage } from './pages/SessionExpiredPage'
 import { PatientDashboard } from './pages/patient/Dashboard'
 import { ProtectedRoute, RoleLandingRedirect } from './routes/RouteGuards'
+import { MriUpload } from './pages/patient/MriUpload'
+import { DoctorPatients } from './pages/doctor/Patients'
+import { DoctorPatientDetail } from './pages/doctor/PatientDetail'
+import { MriOverview } from './pages/doctor/MriOverview'
+import { PatientAppointments } from './pages/patient/Appointments'
+import { DoctorAppointments } from './pages/doctor/Appointments'
+import { ConsultationRoom } from './pages/consultation/ConsultationRoom'
+import { ConsultationReport } from './pages/consultation/ConsultationReport'
 
 function App() {
   return (
@@ -48,14 +56,14 @@ function App() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/patient/appointments"
-        element={
-          <ProtectedRoute allowedRoles={['patient']}>
-            <PlaceholderPage title="Appointments" />
-          </ProtectedRoute>
-        }
-      />
+       <Route
+         path="/patient/appointments"
+         element={
+           <ProtectedRoute allowedRoles={['patient']}>
+             <PatientAppointments />
+           </ProtectedRoute>
+         }
+       />
 
       <Route
         path="/doctor/dashboard"
@@ -66,13 +74,29 @@ function App() {
         }
       />
       <Route
-        path="/doctor/patients"
-        element={
-          <ProtectedRoute allowedRoles={['doctor']}>
-            <PlaceholderPage title="My patients" />
-          </ProtectedRoute>
-        }
-      />
+  path="/doctor/patients"
+  element={
+    <ProtectedRoute allowedRoles={['doctor']}>
+      <DoctorPatients />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/doctor/patients/:id"
+  element={
+    <ProtectedRoute allowedRoles={['doctor']}>
+      <DoctorPatientDetail />
+    </ProtectedRoute>
+  }
+/>
+<Route
+         path="/doctor/appointments"
+         element={
+           <ProtectedRoute allowedRoles={['doctor']}>
+             <DoctorAppointments />
+           </ProtectedRoute>
+         }
+       />
       <Route
         path="/doctor/consultations"
         element={
@@ -114,9 +138,41 @@ function App() {
           </ProtectedRoute>
         }
       />
-
+      <Route
+        path="/patient/mri"
+        element={
+          <ProtectedRoute allowedRoles={['patient']}>
+            <MriUpload />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+  path="/doctor/mri"
+  element={
+    <ProtectedRoute allowedRoles={['doctor']}>
+      <MriOverview />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/consultation/:appointmentId"
+  element={
+    <ProtectedRoute allowedRoles={['patient', 'doctor']}>
+      <ConsultationRoom />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/doctor/consultations/:appointmentId/report"
+  element={
+    <ProtectedRoute allowedRoles={['doctor']}>
+      <ConsultationReport />
+    </ProtectedRoute>
+  }
+/>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    
   )
 }
 

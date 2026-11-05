@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import uuid
 import json
 import threading
 import time
@@ -125,7 +125,20 @@ class KeycloakAuthentication(authentication.BaseAuthentication):
                 updated_fields.append("is_active")
             if updated_fields:
                 user.save(update_fields=updated_fields)
+            if user.role == UserRole.PATIENT:
+                from patients.models import PatientProfile
 
+                PatientProfile.objects.get_or_create(
+                    user=user,
+                    defaults={"pseudonym": f"patient-{uuid.uuid4().hex[:12]}"},
+                )
+            if user.role == UserRole.DOCTOR:
+                from doctors.models import DoctorProfile
+
+                DoctorProfile.objects.get_or_create(
+                    user=user,
+                    defaults={"license_number": f"TMP-{uuid.uuid4().hex[:10]}"},
+                )
             if created:
                 create_audit_entry(
                     user=user,

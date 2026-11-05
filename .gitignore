@@ -7,3 +7,5 @@ venv/
 .venv/
 node_modules/
 .pytest_cache/
+stt-service/debug/
+*.wav

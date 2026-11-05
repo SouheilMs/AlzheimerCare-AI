@@ -29,12 +29,22 @@ class DoctorPatientAssignment(models.Model):
         related_name="assignments",
     )
     assigned_at = models.DateTimeField(auto_now_add=True)
+    analyzed_by = models.ForeignKey(
+        DoctorProfile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="analyzed_scans",
+    )
+    analyzed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = ("doctor", "patient")
 
     def __str__(self) -> str:
         return f"Assignment<{self.doctor_id}:{self.patient_id}>"
+
+
 class MRIScan(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
@@ -54,6 +64,18 @@ class MRIScan(models.Model):
         choices=Status.choices,
         default=Status.PENDING,
     )
+    risk_score = models.FloatField(null=True, blank=True)
+    confidence = models.FloatField(null=True, blank=True)
+    model_version = models.CharField(max_length=64, blank=True)
+    simulated = models.BooleanField(default=False)
+    analyzed_by = models.ForeignKey(
+        DoctorProfile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="analyzed_mri_scans",
+    )
+    analyzed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-uploaded_at"]

@@ -27,7 +27,7 @@ export const authFetch = async (
     if (token) {
       headers.set('Authorization', 'Be' + 'arer ' + token)
     }
-    if (!headers.has('Content-Type')) {
+       if (!headers.has('Content-Type') && !(init.body instanceof FormData)) {
       headers.set('Content-Type', 'application/json')
     }
     return fetch(input, { ...init, headers })

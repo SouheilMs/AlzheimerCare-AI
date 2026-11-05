@@ -92,13 +92,31 @@ services:
     container_name: Alzheimers-AI-Service
     build: ./ai-service
     env_file: .env
-    command: sh -c "pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port ${AI_SERVICE_PORT:-8001}"
+    command: sh -c "pip install --default-timeout=1000 --retries 10 -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port ${AI_SERVICE_PORT:-8001}"
     volumes:
       - ./ai-service:/app
     ports:
       - "${AI_SERVICE_PORT:-8001}:${AI_SERVICE_PORT:-8001}"
     depends_on:
       - backend
+
+  mailpit:
+    container_name: Alzheimers-Mailpit
+    image: axllent/mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
+  livekit:
+    container_name: Alzheimers-LiveKit
+    image: livekit/livekit-server:latest
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./infra/livekit/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "50000-50020:50000-50020/udp"
 
 volumes:
   postgres_data:
