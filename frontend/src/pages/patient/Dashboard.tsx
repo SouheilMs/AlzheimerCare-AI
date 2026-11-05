@@ -1,11 +1,13 @@
-import { CalendarClock, Gamepad2, TrendingUp } from 'lucide-react'
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis} from 'recharts'
+import { Brain, CalendarClock, ClipboardList, Gamepad2, TrendingUp } from 'lucide-react'
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { AppShell } from '../../components/layout/AppShell'
 import { chartColors } from '../../styles/tokens'
 import { Badge, Button, Card, EmptyState, Skeleton, WidgetError } from '../../components/ui'
+import { PageHero } from '../../components/ui/PageHero'
 import { usePatientDashboard } from '../../hooks/usePatientDashboard'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatDate } from '../../lib/format'
+import '../../components/doctor/mri/mri.css'
 
 export const PatientDashboard = () => {
   const { user } = useAuth()
@@ -13,16 +15,57 @@ export const PatientDashboard = () => {
 
   return (
     <AppShell>
-      <section className="mb-5">
-        <h1 className="text-2xl font-semibold text-text">Bonjour {user?.fullName.split(' ')[0]}</h1>
-        <p className="mt-1 text-sm text-text-muted">
-          Ravi de vous revoir ! Continuons ensemble sur ce beau chemin.
-        </p>
-      </section>
+      <PageHero
+        icon={Brain}
+        title={`Bonjour ${user?.fullName.split(' ')[0]}`}
+        subtitle="Ravi de vous revoir ! Continuons ensemble sur ce beau chemin."
+      />
 
-      {isError && (
-        <WidgetError message={error.message} onRetry={() => void refetch()} />
-      )}
+      {isError && <WidgetError message={error.message} onRetry={() => void refetch()} />}
+
+      <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <button
+          type="button"
+          className="mri-fade-up flex items-center gap-4 rounded-2xl p-5 text-left text-white shadow-soft transition hover:-translate-y-1"
+          style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
+        >
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
+            <ClipboardList size={24} />
+          </span>
+          <span>
+            <span className="block text-base font-semibold">Commencer un test</span>
+            <span className="block text-xs text-white/80">Évaluez vos capacités cognitives</span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className="mri-fade-up flex items-center gap-4 rounded-2xl p-5 text-left text-white shadow-soft transition hover:-translate-y-1"
+          style={{ background: 'linear-gradient(135deg, #0d9488, #14b8a6)', ['--d' as string]: '80ms' }}
+        >
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
+            <Gamepad2 size={24} />
+          </span>
+          <span>
+            <span className="block text-base font-semibold">Jouer maintenant</span>
+            <span className="block text-xs text-white/80">Stimulez votre mémoire</span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className="mri-fade-up flex items-center gap-4 rounded-2xl border bg-surface p-5 text-left shadow-soft transition hover:-translate-y-1"
+          style={{ ['--d' as string]: '160ms' }}
+        >
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-blue-soft text-brand-blue">
+            <TrendingUp size={24} />
+          </span>
+          <span>
+            <span className="block text-base font-semibold text-text">Voir mon évolution</span>
+            <span className="block text-xs text-text-muted">Suivez vos progrès</span>
+          </span>
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card title="Votre suivi actuel" className="xl:col-span-2">
@@ -31,10 +74,6 @@ export const PatientDashboard = () => {
             <>
               <Badge tone="teal">{data.followUpStatus.label}</Badge>
               <p className="mt-3 text-sm text-text-muted">{data.followUpStatus.detail}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button>Commencer un test</Button>
-                <Button variant="secondary">Jouer maintenant</Button>
-              </div>
             </>
           )}
         </Card>
@@ -84,7 +123,7 @@ export const PatientDashboard = () => {
           {!isLoading && data && data.cognitiveGames.length > 0 && (
             <ul className="space-y-3">
               {data.cognitiveGames.map((game) => (
-                <li key={game.id} className="rounded-md bg-surface-soft p-3">
+                <li key={game.id} className="rounded-xl bg-surface-soft p-3">
                   <p className="text-sm font-semibold text-text">{game.name}</p>
                   <p className="text-xs text-text-muted">
                     {game.duration} • {game.level}
@@ -100,7 +139,6 @@ export const PatientDashboard = () => {
           {!isLoading && data && data.appointments.length > 0 && (
             <article className="space-y-2">
               <p className="text-sm font-semibold text-text">{data.appointments[0].clinician}</p>
-              <p className="text-sm text-text-muted">{data.appointments[0].date}</p>
               <p className="text-sm text-text-muted">{formatDate(data.appointments[0].date)}</p>
               <Badge tone="blue">{data.appointments[0].mode === 'video' ? 'Visioconférence' : 'En cabinet'}</Badge>
             </article>
@@ -115,7 +153,7 @@ export const PatientDashboard = () => {
           {!isLoading && data && data.notifications.length > 0 && (
             <ul className="space-y-2 text-sm text-text-muted">
               {data.notifications.map((item) => (
-                <li key={item} className="flex items-start gap-2 rounded-md bg-surface-soft p-3">
+                <li key={item} className="flex items-start gap-2 rounded-xl bg-surface-soft p-3">
                   <span className="mt-0.5 text-brand-blue" aria-hidden="true">
                     •
                   </span>

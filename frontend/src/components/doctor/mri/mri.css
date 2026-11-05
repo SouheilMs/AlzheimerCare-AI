@@ -26,3 +26,8 @@
   .mri-draw, .mri-pop, .mri-dot { animation: none !important; }
   .mri-ring-progress { transition: none; }
 }
+@keyframes mri-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.mri-float { animation: mri-float 4s ease-in-out infinite; }

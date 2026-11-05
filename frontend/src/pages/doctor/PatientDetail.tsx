@@ -27,7 +27,8 @@ import { useAnalyzeScan, usePatientScans } from '../../hooks/useDoctorPatients'
 import { usePatientProfile } from '../../hooks/usePatientProfile'
 import { formatDate } from '../../lib/format'
 import { usePatientConsultations } from '../../hooks/useConsultation'
-
+import { PageHero } from '../../components/ui/PageHero'
+import { Avatar } from '../../components/ui/Avatar'
 const statusTone = { pending: 'amber', analyzing: 'blue', done: 'teal', failed: 'rose' } as const
 const statusLabel = { pending: 'En attente', analyzing: 'Analyse en cours', done: 'Analysée', failed: 'Échec' } as const
 
@@ -83,18 +84,20 @@ export const DoctorPatientDetail = () => {
         <ArrowLeft size={14} /> Retour aux patients
       </Link>
 
-      <section className="mri-fade-up mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-text">{patient?.pseudonym ?? 'Patient'}</h1>
-          <p className="mt-1 text-sm text-text-muted">
-            {patient?.user_email} • Naissance : {patient?.birth_date ? formatDate(patient.birth_date) : '—'}
-          </p>
-        </div>
-        <Badge tone="blue">
-          <Brain size={12} className="mr-1 inline" />
-          {scans.length} IRM
-        </Badge>
-      </section>
+          <PageHero
+        icon={Brain}
+        title={patient?.pseudonym ?? 'Patient'}
+        subtitle={`${patient?.user_email ?? ''} • Naissance : ${patient?.birth_date ? formatDate(patient.birth_date) : '—'}`}
+        right={
+          <div className="flex items-center gap-3">
+            <Avatar name={patient?.user_email ?? 'Patient'} size={44} />
+            <Badge tone="blue">
+              <Brain size={12} className="mr-1 inline" />
+              {scans.length} IRM
+            </Badge>
+          </div>
+        }
+      />
 
       {/* 🧠 Bloc analyse */}
       <section
@@ -167,7 +170,7 @@ export const DoctorPatientDetail = () => {
 
                     <div className="space-y-4 text-sm">
                       <div>
-                        <p className="text-text-muted">Confiance du modèle</p>
+                        <p className="text-text-muted">Cohérence entre coupes</p>
                         <p className="mb-2 text-3xl font-bold text-text">
                           {selected.confidence !== null ? <ConfidenceValue value={selected.confidence} /> : '—'}
                         </p>
@@ -248,8 +251,9 @@ export const DoctorPatientDetail = () => {
             ))}
           </ul>
           <p className="mt-4 rounded-md bg-surface-soft p-3 text-xs text-text-muted">
-            La confiance indique la certitude du modèle sur sa prédiction. Ce résultat est une aide à la décision :
-            il doit être validé par le médecin et ne remplace pas un diagnostic.
+            La cohérence indique la proportion de coupes de l’IRM dont la prédiction va dans le même sens que le
+résultat global (100 % = toutes les coupes concordent). Ce n’est pas une probabilité d’exactitude. Ce
+résultat est une aide à la décision : il doit être validé par le médecin et ne remplace pas un diagnostic.
           </p>
         </Card>
       </div>

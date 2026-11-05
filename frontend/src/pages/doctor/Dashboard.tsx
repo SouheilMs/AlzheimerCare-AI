@@ -1,9 +1,14 @@
-import { Activity, CalendarCheck, FileClock, UsersRound } from 'lucide-react'
-import { LineChart, ResponsiveContainer, XAxis, YAxis} from 'recharts'
+import { Activity, CalendarCheck, FileClock, Stethoscope, UsersRound } from 'lucide-react'
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { AppShell } from '../../components/layout/AppShell'
-import { Badge, Card, EmptyState, Skeleton, StatCard, WidgetError } from '../../components/ui'
+import { Badge, Card, EmptyState, Skeleton, WidgetError } from '../../components/ui'
+import { Avatar } from '../../components/ui/Avatar'
+import { PageHero } from '../../components/ui/PageHero'
+import { delayStyle } from '../../components/doctor/mri/motion'
+import '../../components/doctor/mri/mri.css'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDoctorDashboard } from '../../hooks/useDoctorDashboard'
+import { chartColors } from '../../styles/tokens'
 import { formatDate, formatRelative } from '../../lib/format'
 
 const riskTone = {
@@ -12,34 +17,63 @@ const riskTone = {
   high: 'rose',
 } as const
 
+const riskWord = {
+  low: 'Faible',
+  moderate: 'Modéré',
+  high: 'Élevé',
+} as const
+
 const statIcons = [UsersRound, CalendarCheck, Activity, FileClock]
 
-export const DoctorDashboard = () => {  
+const statGradients = [
+  'linear-gradient(135deg, #dbeafe, #eff6ff)',
+  'linear-gradient(135deg, #ccfbf1, #f0fdfa)',
+  'linear-gradient(135deg, #fef3c7, #fffbeb)',
+  'linear-gradient(135deg, #ede9fe, #f5f3ff)',
+]
+
+const statColors = ['#2563eb', '#0d9488', '#d97706', '#7c3aed']
+
+export const DoctorDashboard = () => {
   const { user } = useAuth()
   const { data, isLoading, isError, error, refetch } = useDoctorDashboard() as any
 
   return (
     <AppShell>
-      <section className="mb-5">
-        <h1 className="text-2xl font-semibold text-text">Bonjour {user?.fullName}</h1>
-        <p className="mt-1 text-sm text-text-muted">
-          Voici un aperçu de vos patients et des actions à suivre aujourd’hui.
-        </p>
-      </section>
+      <PageHero
+        icon={Stethoscope}
+        title={`Bonjour Dr. ${user?.fullName ?? ''}`}
+        subtitle="Voici un aperçu de vos patients et des actions à suivre aujourd’hui."
+      />
 
       {isError && <WidgetError message={error.message} onRetry={() => void refetch()} />}
 
       <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" data-testid="doctor-stats">
         {isLoading && Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
-        {!isLoading && data?.metrics.map((metric: any, index: any) => (
-            <StatCard
-              key={metric.id}
-              title={metric.label}
-              value={metric.value}
-              change={metric.change}
-              icon={statIcons[index]}
-            />
-          ))}
+        {!isLoading &&
+          data?.metrics.map((metric: any, index: number) => {
+            const Icon = statIcons[index % 4]
+            const color = statColors[index % 4]
+            return (
+              <div
+                key={metric.id}
+                className="mri-fade-up flex items-start justify-between gap-3 rounded-2xl border p-5 shadow-soft transition-all duration-200 hover:-translate-y-1"
+                style={{ background: statGradients[index % 4], ...delayStyle(index * 80) }}
+              >
+                <div>
+                  <p className="text-sm text-text-muted">{metric.label}</p>
+                  <p className="mt-2 text-3xl font-bold text-text">{metric.value}</p>
+                  <p className="mt-1 text-xs text-text-soft">{metric.change}</p>
+                </div>
+                <span
+                  className="flex h-11 w-11 items-center justify-center rounded-xl bg-white shadow-sm"
+                  style={{ color }}
+                >
+                  <Icon size={22} aria-hidden="true" />
+                </span>
+              </div>
+            )
+          })}
       </div>
 
       <div className="grid grid-cols-1 gap-4 2xl:grid-cols-3">
@@ -65,9 +99,16 @@ export const DoctorDashboard = () => {
                 <tbody>
                   {data.patientsNeedingAttention.map((patient: any) => (
                     <tr key={patient.id} className="border-t">
-                      <td className="py-3 font-medium text-text">{patient.fullName}</td>
                       <td className="py-3">
-                        <Badge tone={riskTone[patient.riskState as keyof typeof riskTone]}>{patient.riskState}</Badge>
+                        <div className="flex items-center gap-3">
+                          <Avatar name={patient.fullName} size={34} />
+                          <span className="font-medium text-text">{patient.fullName}</span>
+                        </div>
+                      </td>
+                      <td className="py-3">
+                        <Badge tone={riskTone[patient.riskState as keyof typeof riskTone]}>
+                          {riskWord[patient.riskState as keyof typeof riskWord] ?? patient.riskState}
+                        </Badge>
                       </td>
                       <td className="py-3 text-text-muted">{formatDate(patient.lastConsultationDate)}</td>
                       <td className="py-3 text-text-muted">{patient.reason || '—'}</td>
@@ -82,21 +123,18 @@ export const DoctorDashboard = () => {
         <Card title="Accès rapide - Analyse Deep Learning" data-testid="doctor-prediction">
           {isLoading && <Skeleton className="h-44 w-full" />}
           {!isLoading && data && !data.quickPrediction && (
-            <EmptyState
-              title="Aucune analyse récente"
-              description="Les analyses IA apparaîtront ici."
-            />
+            <EmptyState title="Aucune analyse récente" description="Les analyses IA apparaîtront ici." />
           )}
           {!isLoading && data?.quickPrediction && (
             <div className="space-y-3 text-sm text-text-muted">
-              <Badge tone="rose">Draft - requires doctor validation</Badge>
-              <p className="font-semibold text-text">
-                Estimated probability of progression over the chosen horizon:{' '}
+              <Badge tone="rose">Brouillon – à valider par le médecin</Badge>
+              <p className="text-3xl font-bold text-text">
                 {(data.quickPrediction.risk_score * 100).toFixed(0)}%
               </p>
+              <p className="font-semibold text-text">Probabilité estimée de progression sur l’horizon choisi</p>
               <p>{data.quickPrediction.summary}</p>
               <p className="text-xs text-text-soft">
-                Confiance {(data.quickPrediction.confidence * 100).toFixed(0)}% • Modèle{' '}
+                Cohérence {(data.quickPrediction.confidence * 100).toFixed(0)}% • Modèle{' '}
                 {data.quickPrediction.model_version} • Horizon {data.quickPrediction.horizon}
               </p>
             </div>
@@ -111,15 +149,17 @@ export const DoctorDashboard = () => {
           {!isLoading && data && data.alerts.length > 0 && (
             <ul className="space-y-3">
               {data.alerts.map((alert: any) => (
-                <li key={alert.id} className="rounded-md bg-surface-soft p-3 text-sm">
+                <li key={alert.id} className="rounded-xl bg-surface-soft p-3 text-sm">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-semibold text-text">{alert.patientName}</p>
-                    <Badge tone={riskTone[alert.severity as keyof typeof riskTone]}>{alert.severity}</Badge>
+                    <Badge tone={riskTone[alert.severity as keyof typeof riskTone]}>
+                      {riskWord[alert.severity as keyof typeof riskWord] ?? alert.severity}
+                    </Badge>
                   </div>
                   <p className="mt-1 text-text-muted">{alert.summary}</p>
                   <p className="mt-1 text-xs text-text-soft">{formatRelative(alert.createdAt)}</p>
                   <Badge tone="rose" className="mt-2">
-                    Draft - requires doctor validation
+                    Brouillon – à valider par le médecin
                   </Badge>
                 </li>
               ))}
@@ -135,12 +175,15 @@ export const DoctorDashboard = () => {
           {!isLoading && data && data.consultations.length > 0 && (
             <ul className="space-y-2 text-sm">
               {data.consultations.map((consultation: any) => (
-                <li key={consultation.id} className="rounded-md bg-surface-soft p-3">
-                  <p className="font-semibold text-text">{consultation.patientName}</p>
-                  <p className="text-text-muted">
-                    {formatDate(consultation.date)} • {consultation.startTime}
-                  </p>
-                  <p className="text-text-soft">{consultation.purpose}</p>
+                <li key={consultation.id} className="flex items-center gap-3 rounded-xl bg-surface-soft p-3">
+                  <Avatar name={consultation.patientName} size={38} />
+                  <div>
+                    <p className="font-semibold text-text">{consultation.patientName}</p>
+                    <p className="text-text-muted">
+                      {formatDate(consultation.date)} • {consultation.startTime}
+                    </p>
+                    <p className="text-text-soft">{consultation.purpose}</p>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -155,11 +198,11 @@ export const DoctorDashboard = () => {
           {!isLoading && data && data.reports.length > 0 && (
             <ul className="space-y-2 text-sm">
               {data.reports.map((report: any) => (
-                <li key={report.id} className="rounded-md bg-surface-soft p-3">
+                <li key={report.id} className="rounded-xl bg-surface-soft p-3">
                   <p className="font-semibold text-text">{report.patientName}</p>
                   <p className="text-text-muted">{formatRelative(report.createdAt)}</p>
                   <Badge tone="rose" className="mt-2">
-                    Draft - requires doctor validation
+                    Brouillon – à valider par le médecin
                   </Badge>
                 </li>
               ))}
@@ -181,6 +224,10 @@ export const DoctorDashboard = () => {
                 <LineChart data={data.scoreEvolution}>
                   <XAxis dataKey="month" tickLine={false} axisLine={false} />
                   <YAxis domain={[40, 100]} tickLine={false} axisLine={false} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="memory" name="Mémoire" stroke={chartColors.memory} strokeWidth={2.5} />
+                  <Line type="monotone" dataKey="attention" name="Attention" stroke={chartColors.attention} strokeWidth={2.5} />
+                  <Line type="monotone" dataKey="regularity" name="Régularité" stroke={chartColors.regularity} strokeWidth={2.5} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

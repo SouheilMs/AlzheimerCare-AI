@@ -2,12 +2,13 @@ import { CalendarCheck, CalendarPlus, Video } from 'lucide-react'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { BookingDialog } from '../../components/appointments/BookingDialog'
+import { JoinConsultationButton } from '../../components/appointments/JoinConsultationButton'
 import { delayStyle } from '../../components/doctor/mri/motion'
 import '../../components/doctor/mri/mri.css'
 import { AppShell } from '../../components/layout/AppShell'
 import { Badge, Button, Card, EmptyState, Skeleton, WidgetError } from '../../components/ui'
+import { PageHero } from '../../components/ui/PageHero'
 import { useMyAppointments } from '../../hooks/useAppointments'
-import { JoinConsultationButton } from '../../components/appointments/JoinConsultationButton'
 
 const when = (iso: string) =>
   new Intl.DateTimeFormat('fr-FR', {
@@ -37,16 +38,17 @@ export const PatientAppointments = () => {
 
   return (
     <AppShell>
-      <section className="mri-fade-up mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-text">Mes rendez-vous</h1>
-          <p className="mt-1 text-sm text-text-muted">Vos consultations à venir avec votre médecin.</p>
-        </div>
-        <Button onClick={() => setOpen(true)}>
-          <CalendarPlus size={16} className="mr-2 inline" />
-          Prendre rendez-vous
-        </Button>
-      </section>
+      <PageHero
+        icon={CalendarCheck}
+        title="Mes rendez-vous"
+        subtitle="Vos consultations à venir avec votre médecin."
+        right={
+          <Button onClick={() => setOpen(true)}>
+            <CalendarPlus size={16} className="mr-2 inline" />
+            Prendre rendez-vous
+          </Button>
+        }
+      />
 
       {isError && <WidgetError message={error.message} onRetry={() => void refetch()} />}
       {isLoading && <Skeleton className="h-32 w-full" />}
@@ -74,8 +76,14 @@ export const PatientAppointments = () => {
                 </Badge>
               </div>
               <div className="mt-3">
-  <JoinConsultationButton appointmentId={a.id} mode={a.mode} startsAt={a.starts_at} endsAt={a.ends_at} status={a.status} />
-</div>
+                <JoinConsultationButton
+                  appointmentId={a.id}
+                  mode={a.mode}
+                  startsAt={a.starts_at}
+                  endsAt={a.ends_at}
+                  status={a.status}
+                />
+              </div>
             </Card>
           </div>
         ))}

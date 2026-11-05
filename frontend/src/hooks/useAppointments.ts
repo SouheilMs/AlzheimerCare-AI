@@ -37,3 +37,16 @@ export const useBookAppointment = () => {
     },
   })
 }
+
+export const useCancelAppointment = () => {
+  const auth = useAuthAdapter()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => appointmentsApi.cancel(id, auth),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['appointments', 'mine'] })
+      void queryClient.invalidateQueries({ queryKey: ['dashboard', 'patient'] })
+      void queryClient.invalidateQueries({ queryKey: slotsKey })
+    },
+  })
+}
