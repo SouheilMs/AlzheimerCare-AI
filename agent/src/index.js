@@ -1,13 +1,17 @@
 import { AccessToken } from 'livekit-server-sdk'
 import { Room, RoomEvent, TrackKind, AudioStream } from '@livekit/rtc-node'
+import express from 'express'
 
 const STT_URL = process.env.STT_URL ?? 'http://localhost:8002'
 const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8000'
 const AGENT_SECRET = process.env.AGENT_SHARED_SECRET ?? ''
 const THRESHOLD = Number(process.env.VOICE_THRESHOLD ?? 400)
+const PORT = Number(process.env.PORT ?? 3001)
 const SILENCE_MS = 1500
 const MAX_SEGMENT_MS = 25_000
 const MIN_SPEECH_MS = 600
+
+const active = new Set() // salles où l'agent est déjà présent
 
 const makeAgentToken = async (roomName) => {
   const token = new AccessToken(
@@ -42,7 +46,7 @@ const toWav = (samples, sampleRate, channels) => {
 // File d'attente : les segments sont traités un par un
 let queue = Promise.resolve()
 const enqueue = (job) => {
-  queue = queue.then(job).catch((e) => console.error('Erreur :', e.message))
+  queue = queue.then(job).catch((e) => console.error('Erreur :', e.message, e.cause))
 }
 
 const sendSegment = async (roomName, speaker, wav) => {
@@ -91,8 +95,8 @@ const flush = (state, roomName, speaker) => {
 const listen = async (track, participant, roomName) => {
   const speaker = participant.identity.split('-')[0] // "doctor" ou "patient"
   const state = { chunks: [], totalMs: 0, speechMs: 0, silenceMs: 0, speaking: false, sampleRate: 16000, channels: 1 }
-  console.log('J\'écoute :', participant.identity)
-  const preRoll = []   // derniers 400 ms avant la voix
+  console.log("J'écoute :", participant.identity)
+  const preRoll = [] // derniers 400 ms avant la voix
   const PRE_ROLL_MS = 400
   let preRollMs = 0
   const stream = new AudioStream(track, 16000, 1)
@@ -157,22 +161,49 @@ const joinRoom = async (roomName) => {
   room.on(RoomEvent.ParticipantDisconnected, (participant) => {
     console.log('Parti :', participant.identity)
     if (room.remoteParticipants.size === 0) {
-      console.log('Salle vide : le robot termine.')
       setTimeout(async () => {
-        await queue
+        if (room.remoteParticipants.size > 0) return // quelqu'un est revenu
+        console.log('Salle vide : le robot sort de', roomName)
+        await queue // laisse finir les transcriptions en cours
         await room.disconnect()
-        process.exit(0)
       }, 2000)
     }
   })
+
+  room.on(RoomEvent.Disconnected, () => active.delete(roomName))
 
   await room.connect(process.env.LIVEKIT_URL, jwt)
   console.log('Le robot est dans la salle', roomName)
 }
 
-const roomName = process.argv[2]
-if (!roomName) {
-  console.log('Donne le nom de la salle : npm start -- consult-xxxxxxxxxxxxxxxx')
-  process.exit(1)
+const startAgent = (roomName) => {
+  if (active.has(roomName)) return false
+  active.add(roomName)
+  joinRoom(roomName).catch((e) => {
+    console.error('Impossible de rejoindre', roomName, e.message)
+    active.delete(roomName)
+  })
+  return true
 }
-await joinRoom(roomName)
+
+// --- Petit serveur HTTP appelé par Django ---
+const app = express()
+app.use(express.json())
+
+app.post('/join', (req, res) => {
+  if (!AGENT_SECRET || req.get('X-Agent-Secret') !== AGENT_SECRET) {
+    return res.status(403).json({ detail: 'Refusé' })
+  }
+  const room = String(req.body?.room ?? '')
+  if (!/^consult-[a-f0-9]{16}$/.test(room)) {
+    return res.status(400).json({ detail: 'Salle invalide' })
+  }
+  res.json({ started: startAgent(room) })
+})
+
+app.get('/health', (_req, res) => res.json({ ok: true, rooms: [...active] }))
+
+app.listen(PORT, () => console.log(`Agent prêt sur le port ${PORT}`))
+
+// Mode manuel toujours possible : npm start -- consult-xxx
+if (process.argv[2]) startAgent(process.argv[2])

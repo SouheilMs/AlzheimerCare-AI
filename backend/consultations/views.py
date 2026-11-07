@@ -1,4 +1,9 @@
+import hmac
+import threading
+
 from django.conf import settings
+from django.db.models import F, TextField, Value
+from django.db.models.functions import Concat
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status
@@ -8,14 +13,10 @@ from rest_framework.views import APIView
 from appointments.models import Appointment
 from audit_logs.services import create_audit_entry
 from consultations.models import Consultation
-from consultations.services import build_token, join_window
-import hmac
-
-from django.db.models import F, TextField, Value
-from django.db.models.functions import Concat
-import threading
-
 from consultations.report import build_report
+from consultations.services import build_token, join_window, start_agent
+
+
 def _load(request, appointment_id):
     """Retourne (appointment, role) ou (None, None) si l'utilisateur n'est pas concerné."""
     appointment = get_object_or_404(
@@ -88,6 +89,11 @@ class JoinConsultationView(APIView):
             method=request.method,
             metadata={"role": role},
         )
+
+        # Le consentement est donné : l'agent IA entre dans la salle tout seul
+        if consultation.patient_consent_at is not None:
+            start_agent(consultation.room_name)
+
         return Response(
             {
                 "token": token,
@@ -118,6 +124,8 @@ class EndConsultationView(APIView):
             consultation.save(update_fields=["status", "ended_at"])
             threading.Thread(target=build_report, args=(consultation.pk,), daemon=True).start()
         return Response({"status": consultation.status})
+
+
 class AgentSegmentView(APIView):
     """POST /api/consultations/internal/segments/ : appelé uniquement par le robot."""
 
@@ -145,6 +153,8 @@ class AgentSegmentView(APIView):
             transcript=Concat(F("transcript"), Value(line), output_field=TextField())
         )
         return Response({"ok": True})
+
+
 class ConsultationReportView(APIView):
     """GET : lire la fiche. PATCH : la modifier. POST : la valider. Réservé au médecin."""
 
@@ -192,6 +202,7 @@ class ConsultationReportView(APIView):
         c.report_validated_at = timezone.now()
         c.save(update_fields=["report_validated_at"])
         return Response({"validated_at": c.report_validated_at.isoformat()})
+
 
 class PatientConsultationsView(APIView):
     """GET /api/consultations/patient/<patient_id>/ : fiches des consultations terminées."""

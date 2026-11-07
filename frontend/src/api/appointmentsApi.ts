@@ -23,11 +23,13 @@ export interface Appointment {
   id: number
   doctor: number
   doctor_email: string
+  doctor_name?: string
   title: string
   starts_at: string
   ends_at: string
   mode: 'in-person' | 'video'
   status: string
+  can_cancel?: boolean
 }
 
 export interface BookPayload {
@@ -49,4 +51,6 @@ export const appointmentsApi = {
   list: (auth: AuthTokenAdapter) => requestJson<Appointment[]>(base, { method: 'GET' }, auth),
   book: (payload: BookPayload, auth: AuthTokenAdapter) =>
     requestJson<Appointment>(base, { method: 'POST', body: JSON.stringify(payload) }, auth),
+  cancel: (id: number, auth: AuthTokenAdapter) =>
+    requestJson<Appointment>(`${base}${id}/cancel/`, { method: 'POST' }, auth),
 }

@@ -10,7 +10,7 @@ describe('requestJson error parsing', () => {
     )
     const error = await requestJson('https://x.test', { method: 'POST' }, auth).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(ApiError)
-    expect((error as ApiError).fieldErrors.email).toEqual(['Enter a valid email address.'])
+    expect((error as ApiError).fieldErrors?.email).toEqual(['Enter a valid email address.'])
   })
 
   it('uses detail for 403', async () => {

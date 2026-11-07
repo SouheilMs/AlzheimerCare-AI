@@ -3,6 +3,7 @@ from django.db.models import Count, Max, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import RetrieveAPIView, UpdateAPIView
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -13,16 +14,23 @@ from accounts.permissions import IsDoctor, IsPatient
 from audit_logs.mixins import SensitiveObjectAuditMixin
 from audit_logs.services import create_audit_entry
 from doctors.models import DoctorProfile
+from notifications.evolution import notify_risk_evolution
+from notifications.patient_alerts import notify_patient_follow_up
+from notifications.services import notify_doctors_new_mri
 from patients.ai_client import AIServiceError, predict_mri
-from patients.models import MRIScan, PatientProfile
+from patients.models import DoctorPatientAssignment, MRIScan, PatientProfile
 from patients.permissions import IsNotAdminClinicalWrite, IsPatientSelfOrAssignedDoctor
 from patients.serializers import (
     MRIScanSerializer,
     PatientClinicalUpdateSerializer,
     PatientProfileSerializer,
 )
-from notifications.services import notify_doctors_new_mri
-from notifications.patient_alerts import notify_patient_follow_up
+
+
+def _display_name(user):
+    full_name = getattr(user, "get_full_name", None)
+    name = full_name() if callable(full_name) else ""
+    return name or getattr(user, "email", "")
 
 
 class PatientProfileDetailView(SensitiveObjectAuditMixin, RetrieveAPIView):
@@ -59,6 +67,12 @@ class MRIScanListCreateView(APIView):
         profile = getattr(request.user, "patient_profile", None)
         if profile is None:
             return Response({"detail": "Patient profile not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if not profile.assignments.exists():
+            return Response(
+                {"detail": "Choisissez d'abord votre médecin avant de déposer une IRM."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         serializer = MRIScanSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
@@ -153,9 +167,11 @@ class MRIScanAnalyzeView(APIView):
             scan.model_version = ""
         scan.save()
 
-        # Risque élevé : propose un rendez-vous de suivi au patient (application + email)
         if scan.status == MRIScan.Status.DONE:
+            # Risque élevé : propose un rendez-vous de suivi au patient (application + email)
             notify_patient_follow_up(scan)
+            # Hausse du risque depuis l'IRM précédente : alerte le médecin
+            notify_risk_evolution(scan)
 
         create_audit_entry(
             user=request.user,
@@ -167,3 +183,73 @@ class MRIScanAnalyzeView(APIView):
             metadata={"status": scan.status},
         )
         return Response(MRIScanSerializer(scan, context={"request": request}).data)
+
+
+class DoctorDirectoryView(APIView):
+    """Liste des médecins que le patient peut choisir."""
+
+    permission_classes = [permissions.IsAuthenticated, IsPatient]
+
+    def get(self, request):
+        doctors = DoctorProfile.objects.select_related("user")
+        return Response(
+            [
+                {
+                    "id": d.pk,
+                    "name": _display_name(d.user),
+                    "email": d.user.email,
+                    "specialty": d.specialty,
+                }
+                for d in doctors
+            ]
+        )
+
+
+class MyDoctorsView(APIView):
+    """Médecins choisis par le patient connecté."""
+
+    permission_classes = [permissions.IsAuthenticated, IsPatient]
+    parser_classes = [MultiPartParser, FormParser, *APIView.parser_classes]
+
+    def _profile(self, request):
+        return getattr(request.user, "patient_profile", None)
+
+    def get(self, request):
+        profile = self._profile(request)
+        if profile is None:
+            return Response({"detail": "Patient profile not found"}, status=status.HTTP_404_NOT_FOUND)
+        assignments = profile.assignments.select_related("doctor__user")
+        return Response(
+            [
+                {
+                    "doctor_id": a.doctor_id,
+                    "name": _display_name(a.doctor.user),
+                    "specialty": a.doctor.specialty,
+                    "assigned_at": a.assigned_at,
+                }
+                for a in assignments
+            ]
+        )
+
+    def post(self, request):
+        profile = self._profile(request)
+        if profile is None:
+            return Response({"detail": "Patient profile not found"}, status=status.HTTP_404_NOT_FOUND)
+        doctor_id = request.data.get("doctor_id")
+        if not doctor_id:
+            raise ValidationError({"doctor_id": "Ce champ est obligatoire."})
+        doctor = get_object_or_404(DoctorProfile, pk=doctor_id)
+        _, created = DoctorPatientAssignment.objects.get_or_create(doctor=doctor, patient=profile)
+        create_audit_entry(
+            user=request.user,
+            action="doctor_chosen",
+            target_model="DoctorPatientAssignment",
+            target_object_id=doctor.pk,
+            path=request.path,
+            method=request.method,
+            metadata={"doctor_id": doctor.pk},
+        )
+        return Response(
+            {"doctor_id": doctor.pk, "created": created},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )

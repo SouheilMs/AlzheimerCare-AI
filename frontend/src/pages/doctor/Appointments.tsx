@@ -7,9 +7,10 @@ import '../../components/doctor/mri/mri.css'
 import { StatTile } from '../../components/doctor/mri/StatTile'
 import { AppShell } from '../../components/layout/AppShell'
 import { Badge, EmptyState, Skeleton, WidgetError } from '../../components/ui'
-import { useDoctorAppointments } from '../../hooks/useDoctorAppointments'
 import { JoinConsultationButton } from '../../components/appointments/JoinConsultationButton'
-
+import { PageHero } from '../../components/ui/PageHero'
+import { useCancelDoctorAppointment, useDoctorAppointments } from '../../hooks/useDoctorAppointments'
+import { CancelAppointmentButton } from '../../components/appointments/CancelAppointmentButton'
 const TZ = 'Africa/Tunis'
 
 const dayKey = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(iso))
@@ -33,7 +34,7 @@ const TABS: Array<{ key: AppointmentScope; label: string }> = [
 export const DoctorAppointments = () => {
   const [scope, setScope] = useState<AppointmentScope>('upcoming')
   const { data = [], isLoading, isError, error, refetch } = useDoctorAppointments(scope)
-
+  const cancel = useCancelDoctorAppointment()
   const groups = useMemo(() => {
     const map = new Map<string, DoctorAppointment[]>()
     for (const a of data) {
@@ -49,12 +50,11 @@ export const DoctorAppointments = () => {
 
   return (
     <AppShell>
-      <section className="mri-fade-up mb-5">
-        <h1 className="text-2xl font-semibold text-text">Mes rendez-vous</h1>
-        <p className="mt-1 text-sm text-text-muted">
-          Les consultations prises par vos patients. La liste se met à jour automatiquement.
-        </p>
-      </section>
+          <PageHero
+        icon={CalendarCheck}
+        title="Mes rendez-vous"
+        subtitle="Les consultations prises par vos patients. La liste se met à jour automatiquement."
+      />
 
       {scope === 'upcoming' && (
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -128,6 +128,13 @@ export const DoctorAppointments = () => {
                           </Badge>
                         )}
                         <JoinConsultationButton appointmentId={a.id} mode={a.mode} startsAt={a.starts_at} endsAt={a.ends_at} status={a.status} />
+                        {a.can_cancel && (
+  <CancelAppointmentButton
+    pending={cancel.isPending && cancel.variables === a.id}
+    error={cancel.isError && cancel.variables === a.id ? cancel.error.message : null}
+    onConfirm={() => cancel.mutate(a.id)}
+  />
+)}
                       </div>
                     </Link>
                   </li>

@@ -1,0 +1,9 @@
+# Dépendances légères pour les tests (sans torch) : utilisées par GitHub Actions
+fastapi==0.116.1
+uvicorn==0.35.0
+python-multipart
+prometheus-client
+pillow
+numpy
+httpx
+pytest
