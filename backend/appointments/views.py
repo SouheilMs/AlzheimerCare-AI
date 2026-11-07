@@ -1,6 +1,6 @@
-from django.shortcuts import render
+import hmac
 
-# Create your views here.
+from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import permissions, status
@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.permissions import IsDoctor, IsPatient
+from appointments.lifecycle import CancellationNotAllowed, cancel_appointment, send_due_reminders
 from appointments.models import Appointment
 from appointments.serializers import (
     AppointmentSerializer,
@@ -165,3 +166,58 @@ class DoctorAppointmentListView(APIView):
         else:
             qs = qs.filter(status=Appointment.Status.SCHEDULED, ends_at__gt=now).order_by("starts_at")
         return Response(DoctorAppointmentSerializer(qs, many=True).data)
+
+
+class AppointmentCancelView(APIView):
+    """POST /api/appointments/<id>/cancel/ : le patient ou le médecin concerné annule le rendez-vous."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        appointment = (
+            Appointment.objects.select_related("patient__user", "doctor__user").filter(pk=pk).first()
+        )
+        # 404 (et non 403) pour ne pas révéler l'existence des rendez-vous des autres
+        if appointment is None:
+            return Response({"detail": "Rendez-vous introuvable"}, status=status.HTTP_404_NOT_FOUND)
+
+        if appointment.patient.user_id == request.user.pk:
+            role, serializer_class = "patient", AppointmentSerializer
+        elif appointment.doctor.user_id == request.user.pk:
+            role, serializer_class = "doctor", DoctorAppointmentSerializer
+        else:
+            return Response({"detail": "Rendez-vous introuvable"}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            cancelled = cancel_appointment(appointment, cancelled_by=role)
+        except CancellationNotAllowed as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+
+        create_audit_entry(
+            user=request.user,
+            action="appointment_cancelled",
+            target_model="Appointment",
+            target_object_id=cancelled.pk,
+            path=request.path,
+            method=request.method,
+            metadata={"cancelled_by": role},
+        )
+        return Response(serializer_class(cancelled).data)
+
+
+class InternalSendRemindersView(APIView):
+    """POST /api/appointments/internal/send-reminders/ : appelé par n8n (ou cron) toutes les heures.
+
+    Protégé par le secret partagé INTERNAL_API_TOKEN (en-tête X-Internal-Token).
+    Désactivé tant que INTERNAL_API_TOKEN n'est pas défini.
+    """
+
+    authentication_classes: list = []
+    permission_classes: list = []
+
+    def post(self, request):
+        expected = getattr(settings, "INTERNAL_API_TOKEN", "")
+        provided = request.headers.get("X-Internal-Token", "")
+        if not expected or not hmac.compare_digest(provided, expected):
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+        return Response({"sent": send_due_reminders()})

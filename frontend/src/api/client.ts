@@ -1,4 +1,5 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+export const apiBaseUrl = API_BASE_URL
 
 export class ApiError extends Error {
   status?: number
@@ -9,6 +10,12 @@ export class ApiError extends Error {
     this.name = 'ApiError'
     this.status = status
     this.details = details
+  }
+
+  get fieldErrors(): Record<string, string[]> | undefined {
+    return typeof this.details === 'object' && this.details !== null
+      ? (this.details as Record<string, string[]>)
+      : undefined
   }
 }
 
@@ -27,7 +34,7 @@ export const authFetch = async (
     if (token) {
       headers.set('Authorization', 'Be' + 'arer ' + token)
     }
-       if (!headers.has('Content-Type') && !(init.body instanceof FormData)) {
+    if (!headers.has('Content-Type') && !(init.body instanceof FormData)) {
       headers.set('Content-Type', 'application/json')
     }
     return fetch(input, { ...init, headers })

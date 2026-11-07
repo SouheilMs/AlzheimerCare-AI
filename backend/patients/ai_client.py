@@ -12,6 +12,7 @@ def predict_mri(scan) -> dict:
             response = requests.post(
                 f"{settings.AI_SERVICE_URL}/predict",
                 files={"file": (scan.file.name.split("/")[-1], f)},
+                headers={"X-Service-Token": settings.AI_SERVICE_TOKEN},
                 timeout=settings.AI_SERVICE_TIMEOUT,
             )
         response.raise_for_status()

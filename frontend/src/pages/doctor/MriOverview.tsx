@@ -10,7 +10,7 @@ import { AppShell } from '../../components/layout/AppShell'
 import { Badge, EmptyState, Skeleton, WidgetError } from '../../components/ui'
 import { useDoctorPatients } from '../../hooks/useDoctorPatients'
 import { formatDate } from '../../lib/format'
-
+import { PageHero } from '../../components/ui/PageHero'
 type Category = 'attention' | 'pending' | 'monitor' | 'stable' | 'empty'
 type Filter = 'all' | Category
 
@@ -106,13 +106,12 @@ export const MriOverview = () => {
 
   return (
     <AppShell>
-      <section className="mri-fade-up mb-5">
-        <h1 className="text-2xl font-semibold text-text">IRM des patients</h1>
-        <p className="mt-1 text-sm text-text-muted">
-          Vue d’ensemble des IRM de tous vos patients. Cliquez sur une carte pour ouvrir ses IRM et lancer l’analyse.
-        </p>
-      </section>
-
+   
+<PageHero
+  icon={Brain}
+  title="IRM des patients"
+  subtitle="Vue d’ensemble des IRM de tous vos patients. Cliquez sur une carte pour ouvrir ses IRM."
+/>
       {isError && <WidgetError message={error.message} onRetry={() => void refetch()} />}
 
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

@@ -89,4 +89,12 @@ export const doctorDashboardMock: DoctorDashboardData = {
       'Estimated probability of progression over the chosen horizon is elevated and should be reviewed with clinical context.',
     requiresValidation: true,
   },
+  scoreEvolution: [
+    { month: 'Mai', memory: 72, attention: 68, regularity: 80 },
+    { month: 'Juin', memory: 70, attention: 66, regularity: 78 },
+    { month: 'Juil', memory: 67, attention: 65, regularity: 74 },
+    { month: 'Août', memory: 64, attention: 61, regularity: 73 },
+    { month: 'Sept', memory: 60, attention: 58, regularity: 70 },
+    { month: 'Oct', memory: 57, attention: 55, regularity: 68 },
+  ],
 }
