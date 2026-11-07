@@ -42,7 +42,7 @@ export const DoctorDashboard = () => {
     <AppShell>
       <PageHero
         icon={Stethoscope}
-        title={`Bonjour Dr. ${user?.fullName ?? ''}`}
+        title={`Bonjour ${user?.fullName ?? ''}`}
         subtitle="Voici un aperçu de vos patients et des actions à suivre aujourd’hui."
       />
 
